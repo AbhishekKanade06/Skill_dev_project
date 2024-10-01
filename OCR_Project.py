@@ -5,9 +5,7 @@ import pandas as pd
 import cv2
 import os
 from paddleocr import PaddleOCR
-import matplotlib.pyplot as plt
 import numpy as np
-from keras._tf_keras.keras.preprocessing import image
 from keras._tf_keras.keras.models import load_model
 # Initialize PaddleOCR model
 ocr = PaddleOCR(use_angle_cls=True, lang='en')
@@ -110,20 +108,18 @@ def PA_model(cell):
 
 
 def main():
-    # Preprocess the image
+    
     image, binary_image = preprocess_image(img_path)
 
-    # Detect lines and draw red rectangles around the cells
     image_with_lines, contours = detect_lines_and_draw(image, binary_image)
 
-    # Save the output image with red bounding boxes
+ 
     output_image_path = 'image_with_lines.png'
     cv2.imwrite(output_image_path, image_with_lines)
 
-    # Create output directory for individual cells
+ 
     output_cells_dir = 'output_cells'
     img=cv2.imread(img_path)
-    # Save individual cells in the output directory
     process_cells(img, contours, output_cells_dir)
 
     data_xl(data)
