@@ -5,12 +5,16 @@ import pandas as pd
 import cv2
 import os
 from paddleocr import PaddleOCR
+import matplotlib.pyplot as plt
 import numpy as np
+from keras._tf_keras.keras.preprocessing import image
 from keras._tf_keras.keras.models import load_model
 # Initialize PaddleOCR model
 ocr = PaddleOCR(use_angle_cls=True, lang='en')
 model=load_model('P&A_model.h5')
 data=[]
+ocr_data=[]
+model_data=[]
 #File Path Input
 def select_file(): 
     global img_path
@@ -44,7 +48,7 @@ def detect_lines_and_draw(image, binary_image):
     horizontal_lines = cv2.dilate(horizontal_lines, horizontal_kernel, iterations=4)
 
     # Combine vertical and horizontal lines to get a grid
-    grid = cv2.addWeighted(vertical_lines, 0.5, horizontal_lines, 0.5, 0.0)
+    grid = cv2.addWeighted(vertical_lines, 1, horizontal_lines, 1, 0.0)
 
     # Find contours in the grid image
     contours, _ = cv2.findContours(grid, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -81,18 +85,21 @@ def process_cells(image, contours, output_dir):
 
     return cell_images
 def test_exract(cell,f):
+    h,w,c=cell.shape
+    if(h <=40 or w<=40 or h >=1800 or w >=1800):
+        return
     if(f):
         return
     result=ocr.ocr(cell,cls=True)
     try:
         data.append(result[0][0][1][0])
+        ocr_data.append(result[0][0][1][0])
     except :
         y=PA_model(cell)
         print(y)
         if y=='P' :
-            data.append('P')
-        elif y=='A':
-            data.append('A')          
+            data.append('P') 
+            model_data.append('P')        
 def PA_model(cell):
     x=cell
     kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
@@ -105,27 +112,49 @@ def PA_model(cell):
     class_labels ={0: 'Other1', 1: 'P'}
     return class_labels[predicted_class]
 
-
-
 def main():
-    
+    # Preprocess the image
     image, binary_image = preprocess_image(img_path)
 
+    # Detect lines and draw red rectangles around the cells
     image_with_lines, contours = detect_lines_and_draw(image, binary_image)
 
- 
+    # Save the output image with red bounding boxes
     output_image_path = 'image_with_lines.png'
     cv2.imwrite(output_image_path, image_with_lines)
 
- 
+    # Create output directory for individual cells
     output_cells_dir = 'output_cells'
     img=cv2.imread(img_path)
+    # Save individual cells in the output directory
     process_cells(img, contours, output_cells_dir)
+    print(data)
+    print()
+    print("OCR")
+    print(ocr_data)
+    print()
+    print("Model")
+    print(model_data)
+    print()
+    print(P_first(data))
 
-    data_xl(data)
 
-def data_xl(data):
-    def no_days(data):
+    data_xl_1(data)
+
+def P_first(data):
+    name=False
+    p=0
+    for i in data:
+        if not name and i.lower()=='name':
+            name=True
+        if name and '080' in i and p<2:
+            return False
+        if name and i=='P':
+            p+=1
+        if name and '080' in i and p>2:
+            return True
+
+def no_days(data):
         days=0
         for i in data:
             if i.isdigit():
@@ -134,32 +163,50 @@ def data_xl(data):
                 else:
                     days+=1
                 
-            elif i.lower()=='name':
+            elif "0801" in i:
                 break
         return days
 
+
+def data_xl_1(data):
     days=no_days(data)
     print(days)
     enroll=[]
     name=[]
     attendance=[]
     flag=False
+    flag1=False
     counter=0
-    for i in range(0,len(data)):
-       
-      
-        if data[i].lower()=='name':
-            flag=True
-        if data[i]=='P' and flag:
-            counter+=1    
-        if flag and len(data[i]) > 8:
-            if '080' in data[i] :
-                enroll.append(data[i])
-            else:
-                name.append(data[i])  
-                attendance.append(counter)
-                counter=0
-                   
+    if P_first(data):
+        for i in range(0,len(data)):
+            if data[i].lower()=='name':
+                flag=True    
+            if flag and len(data[i]) > 8:
+                if '080' in data[i] :
+                    enroll.append(data[i])
+                else:
+                    name.append(data[i])  
+                    
+                    attendance.append(counter)
+                    
+                    counter=0
+            if ('P' in data[i] or data[i]=='d'or data[i]=='a') and flag:
+                counter+=1 
+    else:
+        for i in range(0,len(data)):
+            if data[i].lower()=='name':
+                flag=True    
+            if flag and len(data[i]) > 8:
+                if '080' in data[i] :
+                    enroll.append(data[i])
+                else:
+                    name.append(data[i]) 
+                    if flag1:
+                        attendance.append(counter)
+                        counter=0
+                    flag1=True    
+            if ('P' in data[i] or data[i]=='d'or data[i]=='a') and flag1:
+                counter+=1 
 
     print(enroll,len(enroll))
     print(name,len(name))
@@ -168,7 +215,8 @@ def data_xl(data):
         enroll =enroll+[enroll[1][0:6]+"______"]*(len(name)-len(enroll))
     if(len(name)<len(enroll)):
         name =name+[np.nan]*(-len(name)+len(enroll))    
-
+    if(len(attendance)< len(name)):
+        attendance=attendance+[0]*(len(name)-len(attendance))
     datafram=pd.DataFrame({
         "Enroll_no":enroll,
         "Name":name,
