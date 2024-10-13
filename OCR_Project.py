@@ -11,7 +11,7 @@ from keras._tf_keras.keras.preprocessing import image
 from keras._tf_keras.keras.models import load_model
 # Initialize PaddleOCR model
 ocr = PaddleOCR(use_angle_cls=True, lang='en')
-model=load_model('P&A_model.h5')
+model=load_model('P&A_model1.h5')
 data=[]
 ocr_data=[]
 model_data=[]
@@ -104,7 +104,7 @@ def PA_model(cell):
     x=cell
     kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
     cell = cv2.filter2D(cell, -1, kernel)
-    cell=cv2.resize(cell,(225,225))
+    cell=cv2.resize(cell,(75,75))
     cell=np.expand_dims(cell, axis=0)
     predictions = model.predict(cell)
     predicted_class = np.argmax(predictions[0])
